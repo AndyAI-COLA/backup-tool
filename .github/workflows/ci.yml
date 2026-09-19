@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+
+    - name: Test imports
+      run: |
+        cd backend
+        python -c "from models import *; from auth import *; from backup import *; print('All imports OK')"
+
+    - name: Build Docker image
+      run: |
+        docker build -t backup-tool:test .
+
+    - name: Run Docker container
+      run: |
+        docker run -d --name test-container -p 8000:8000 backup-tool:test
+        sleep 5
+        curl -f http://localhost:8000/ || exit 1
+        docker stop test-container

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  backup-app:
+    build: .
+    container_name: backup-tool
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+    environment:
+      - DATABASE_URL=sqlite:///./data/backup.db
+    restart: unless-stopped

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>操作日志 - 数据备份恢复工具</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏 -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>📦 备份工具</h2>
+            </div>
+            <div class="nav-menu">
+                <a href="/dashboard.html" class="nav-item">
+                    <span>📊</span> 仪表盘
+                </a>
+                <a href="/tasks.html" class="nav-item">
+                    <span>📋</span> 备份任务
+                </a>
+                <a href="/files.html" class="nav-item">
+                    <span>📁</span> 文件管理
+                </a>
+                <a href="/logs.html" class="nav-item active">
+                    <span>📝</span> 操作日志
+                </a>
+                <a href="#" class="nav-item" onclick="logout()">
+                    <span>🚪</span> 退出登录
+                </a>
+            </div>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1>操作日志</h1>
+                <button class="btn btn-secondary" onclick="loadLogs()">🔄 刷新</button>
+            </div>
+
+            <!-- 日志列表 -->
+            <div class="card">
+                <div class="card-body" id="log-container">
+                    <div class="empty-state">
+                        <div class="icon">📝</div>
+                        <p>暂无日志</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // 检查登录状态
+        checkAuth();
+
+        // 加载日志
+        loadLogs();
+
+        async function loadLogs() {
+            try {
+                const logs = await apiGet('/logs');
+                const container = document.getElementById('log-container');
+
+                if (logs.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📝</div>
+                            <p>暂无操作日志</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = logs.map(log => `
+                    <div class="log-entry">
+                        <span class="log-time">${new Date(log.created_at).toLocaleString()}</span>
+                        <span class="badge ${getActionBadge(log.action)}">${getActionText(log.action)}</span>
+                        <span class="log-action">${log.target}</span>
+                        <span class="badge ${getStatusBadge(log.status)}">${getStatusText(log.status)}</span>
+                        ${log.message ? `<span style="color: #94a3b8; font-size: 12px;">- ${log.message}</span>` : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载日志失败:', error);
+            }
+        }
+
+        function getActionBadge(action) {
+            const badges = {
+                'login': 'badge-info',
+                'register': 'badge-info',
+                'backup': 'badge-success',
+                'restore': 'badge-warning',
+                'delete': 'badge-danger',
+                'create_task': 'badge-info',
+                'delete_task': 'badge-danger'
+            };
+            return badges[action] || 'badge-secondary';
+        }
+
+        function getActionText(action) {
+            const texts = {
+                'login': '登录',
+                'register': '注册',
+                'backup': '备份',
+                'restore': '恢复',
+                'delete': '删除',
+                'create_task': '创建任务',
+                'delete_task': '删除任务'
+            };
+            return texts[action] || action;
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                'success': 'badge-success',
+                'failed': 'badge-danger',
+                'running': 'badge-warning'
+            };
+            return badges[status] || 'badge-secondary';
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                'success': '成功',
+                'failed': '失败',
+                'running': '运行中'
+            };
+            return texts[status] || status;
+        }
+    </script>
+</body>
+</html>

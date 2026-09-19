@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>备份任务 - 数据备份恢复工具</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏 -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>📦 备份工具</h2>
+            </div>
+            <div class="nav-menu">
+                <a href="/dashboard.html" class="nav-item">
+                    <span>📊</span> 仪表盘
+                </a>
+                <a href="/tasks.html" class="nav-item active">
+                    <span>📋</span> 备份任务
+                </a>
+                <a href="/files.html" class="nav-item">
+                    <span>📁</span> 文件管理
+                </a>
+                <a href="/logs.html" class="nav-item">
+                    <span>📝</span> 操作日志
+                </a>
+                <a href="#" class="nav-item" onclick="logout()">
+                    <span>🚪</span> 退出登录
+                </a>
+            </div>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1>备份任务</h1>
+                <button class="btn btn-primary" onclick="openCreateModal()">+ 新建任务</button>
+            </div>
+
+            <!-- 任务列表 -->
+            <div class="card">
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>任务名称</th>
+                                <th>源目录</th>
+                                <th>类型</th>
+                                <th>状态</th>
+                                <th>进度</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="task-list">
+                            <tr>
+                                <td colspan="6" class="empty-state">暂无任务</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新建任务模态框 -->
+    <div class="modal-overlay" id="create-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>新建备份任务</h2>
+                <button class="modal-close" onclick="closeCreateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>任务名称</label>
+                    <input type="text" id="task-name" placeholder="例如: 数据库备份">
+                </div>
+                <div class="form-group">
+                    <label>源目录路径</label>
+                    <input type="text" id="task-source" placeholder="例如: /var/data 或 C:\data">
+                </div>
+                <div class="form-group">
+                    <label>备份类型</label>
+                    <select id="task-type" style="width: 100%; padding: 12px; border-radius: 8px; background: #0f172a; color: #f8fafc; border: 1px solid #334155;">
+                        <option value="full">全量备份</option>
+                        <option value="incremental">增量备份</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>压缩格式</label>
+                    <select id="task-format" style="width: 100%; padding: 12px; border-radius: 8px; background: #0f172a; color: #f8fafc; border: 1px solid #334155;">
+                        <option value="tar.gz">tar.gz</option>
+                        <option value="zip">zip</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>定时计划（可选，Cron格式）</label>
+                    <input type="text" id="task-schedule" placeholder="例如: 0 2 * * * (每天凌晨2点)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCreateModal()">取消</button>
+                <button class="btn btn-primary" onclick="createTask()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度显示 -->
+    <div id="progress-panel" style="display: none; position: fixed; bottom: 20px; right: 20px; background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; min-width: 300px;">
+        <h3 style="margin-bottom: 10px;">备份进度</h3>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-bar" style="width: 0%"></div>
+        </div>
+        <p style="margin-top: 10px; color: #94a3b8; font-size: 12px;" id="progress-file">准备中...</p>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // 检查登录状态
+        checkAuth();
+
+        // 加载任务列表
+        loadTasks();
+
+        // WebSocket连接
+        let ws = null;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/progress`);
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateProgress(data.progress, data.filename);
+            };
+
+            ws.onclose = function() {
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        connectWebSocket();
+
+        async function loadTasks() {
+            try {
+                const tasks = await apiGet('/tasks');
+                const tbody = document.getElementById('task-list');
+
+                if (tasks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无任务，点击右上角创建</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = tasks.map(task => `
+                    <tr>
+                        <td><strong>${task.name}</strong></td>
+                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${task.source_path}</td>
+                        <td><span class="badge badge-info">${task.backup_type === 'full' ? '全量' : '增量'}</span></td>
+                        <td><span class="badge ${getStatusBadge(task.status)}">${getStatusText(task.status)}</span></td>
+                        <td>
+                            <div class="progress-bar" style="width: 100px;">
+                                <div class="progress-fill" style="width: ${task.progress}%"></div>
+                            </div>
+                            <span style="font-size: 12px; color: #94a3b8;">${task.progress}%</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-success btn-sm" onclick="executeTask(${task.id})">执行</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteTask(${task.id}, '${task.name}')">删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('加载任务失败:', error);
+            }
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                'idle': 'badge-secondary',
+                'running': 'badge-warning',
+                'completed': 'badge-success',
+                'failed': 'badge-danger'
+            };
+            return badges[status] || 'badge-secondary';
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                'idle': '空闲',
+                'running': '运行中',
+                'completed': '已完成',
+                'failed': '失败'
+            };
+            return texts[status] || status;
+        }
+
+        function openCreateModal() {
+            document.getElementById('create-modal').classList.add('active');
+        }
+
+        function closeCreateModal() {
+            document.getElementById('create-modal').classList.remove('active');
+        }
+
+        async function createTask() {
+            const name = document.getElementById('task-name').value;
+            const source = document.getElementById('task-source').value;
+            const type = document.getElementById('task-type').value;
+            const format = document.getElementById('task-format').value;
+            const schedule = document.getElementById('task-schedule').value;
+
+            if (!name || !source) {
+                alert('请填写任务名称和源目录');
+                return;
+            }
+
+            try {
+                await apiPost('/tasks', {
+                    name,
+                    source_path: source,
+                    backup_type: type,
+                    format: format,
+                    schedule: schedule || null
+                });
+
+                alert('任务创建成功');
+                closeCreateModal();
+                loadTasks();
+            } catch (error) {
+                alert('创建失败: ' + error.message);
+            }
+        }
+
+        async function executeTask(taskId) {
+            if (!confirm('确定要执行这个备份任务吗？')) return;
+
+            try {
+                document.getElementById('progress-panel').style.display = 'block';
+                updateProgress(0, '准备中...');
+
+                await apiPost(`/backup/execute/${taskId}`);
+
+                // 轮询进度
+                const pollInterval = setInterval(() => {
+                    loadTasks();
+                }, 1000);
+
+                // 10秒后停止轮询
+                setTimeout(() => {
+                    clearInterval(pollInterval);
+                    document.getElementById('progress-panel').style.display = 'none';
+                    loadTasks();
+                }, 30000);
+
+            } catch (error) {
+                alert('执行失败: ' + error.message);
+                document.getElementById('progress-panel').style.display = 'none';
+            }
+        }
+
+        async function deleteTask(taskId, taskName) {
+            if (!confirm(`确定要删除任务 "${taskName}" 吗？`)) return;
+
+            try {
+                await apiDelete(`/tasks/${taskId}`);
+                alert('删除成功');
+                loadTasks();
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        function updateProgress(progress, filename) {
+            document.getElementById('progress-bar').style.width = progress + '%';
+            document.getElementById('progress-file').textContent = filename || '处理中...';
+        }
+    </script>
+</body>
+</html>

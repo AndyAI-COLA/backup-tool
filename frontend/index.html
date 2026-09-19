@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 数据备份恢复工具</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h1>📦 数据备份恢复工具</h1>
+
+            <!-- 登录表单 -->
+            <div id="login-form">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="login-username" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="login-password" placeholder="请输入密码">
+                </div>
+                <button class="btn btn-primary btn-block" onclick="login()">登 录</button>
+                <p style="text-align: center; margin-top: 20px; color: #94a3b8;">
+                    还没有账号？<a href="#" onclick="showRegister()" style="color: #3b82f6;">立即注册</a>
+                </p>
+            </div>
+
+            <!-- 注册表单 -->
+            <div id="register-form" style="display: none;">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="reg-username" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" id="reg-email" placeholder="请输入邮箱">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="reg-password" placeholder="请输入密码">
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input type="password" id="reg-password2" placeholder="请再次输入密码">
+                </div>
+                <button class="btn btn-primary btn-block" onclick="register()">注 册</button>
+                <p style="text-align: center; margin-top: 20px; color: #94a3b8;">
+                    已有账号？<a href="#" onclick="showLogin()" style="color: #3b82f6;">立即登录</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        function showLogin() {
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('register-form').style.display = 'none';
+        }
+
+        function showRegister() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+        }
+
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            if (!username || !password) {
+                alert('请输入用户名和密码');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('token', data.access_token);
+                    localStorage.setItem('username', data.username);
+                    window.location.href = '/dashboard.html';
+                } else {
+                    alert(data.detail || '登录失败');
+                }
+            } catch (error) {
+                alert('网络错误，请重试');
+            }
+        }
+
+        async function register() {
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const password2 = document.getElementById('reg-password2').value;
+
+            if (!username || !email || !password) {
+                alert('请填写所有字段');
+                return;
+            }
+
+            if (password !== password2) {
+                alert('两次密码不一致');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('注册成功，请登录');
+                    showLogin();
+                } else {
+                    alert(data.detail || '注册失败');
+                }
+            } catch (error) {
+                alert('网络错误，请重试');
+            }
+        }
+
+        // 回车登录
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') login();
+        });
+
+        // 检查是否已登录
+        if (localStorage.getItem('token')) {
+            window.location.href = '/dashboard.html';
+        }
+    </script>
+</body>
+</html>

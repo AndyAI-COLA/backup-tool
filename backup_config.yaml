@@ -1,0 +1,129 @@
+# 数据备份恢复工具配置文件 v2.0
+# Backup Tool Configuration
+
+# 备份存储目录
+backup_dir: ./backups
+
+# 日志目录
+log_dir: ./logs
+
+# 要备份的源目录列表
+sources:
+  - ./data
+  # - /path/to/another/dir
+
+# 压缩格式: tar.gz 或 zip
+format: tar.gz
+
+# 排除的文件和目录模式
+exclude:
+  # Node.js
+  - node_modules
+  - package-lock.json
+  - yarn.lock
+
+  # Python
+  - __pycache__
+  - "*.pyc"
+  - "*.pyo"
+  - "*.pyd"
+  - .venv
+  - venv
+  - env
+  - .env
+  - "*.egg-info"
+
+  # 版本控制
+  - .git
+  - .svn
+  - .hg
+
+  # IDE和编辑器
+  - .idea
+  - .vscode
+  - "*.swp"
+  - "*.swo"
+  - "*~"
+
+  # 系统文件
+  - .DS_Store
+  - Thumbs.db
+  - desktop.ini
+
+  # 日志和临时文件
+  - "*.log"
+  - tmp
+  - temp
+  - "*.tmp"
+
+# ==========================================
+# 备份保留策略
+# ==========================================
+retention:
+  # 保留最近N个备份
+  keep_last_n: 10
+  # 保留最近N天的备份
+  keep_days: 30
+  # 自动清理旧备份
+  auto_cleanup: true
+
+# ==========================================
+# 磁盘空间检查
+# ==========================================
+check_disk_space: true
+min_disk_space_gb: 1
+
+# ==========================================
+# 加密配置
+# ==========================================
+encryption:
+  # 是否启用加密
+  enabled: false
+  # 加密密码（建议使用环境变量或命令行参数）
+  # password: your_secure_password_here
+  # 加密算法: aes256
+  algorithm: aes256
+
+# ==========================================
+# 远程备份配置（SFTP）
+# ==========================================
+remote:
+  # 是否启用远程备份
+  enabled: false
+  # SFTP服务器配置
+  host: your-server.example.com
+  port: 22
+  username: backup_user
+  # 密码（建议使用SSH密钥）
+  # password: your_password
+  # SSH密钥文件路径
+  # key_file: ~/.ssh/id_rsa
+  # 远程备份目录
+  remote_path: /backups
+
+# ==========================================
+# 定时备份配置
+# ==========================================
+schedule:
+  # 是否启用定时备份
+  enabled: false
+  # 备份间隔: hourly, daily, weekly, monthly
+  interval: daily
+  # 执行时间 (24小时制)
+  time: "02:00"
+  # 备份类型
+  type: full
+
+# ==========================================
+# 敏感数据脱敏配置
+# ==========================================
+masking:
+  # 是否启用敏感数据脱敏
+  enabled: true
+  # 需要脱敏的字段模式
+  patterns:
+    - password
+    - secret
+    - token
+    - api_key
+    - private_key

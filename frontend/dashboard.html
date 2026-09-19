@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仪表盘 - 数据备份恢复工具</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏 -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>📦 备份工具</h2>
+            </div>
+            <div class="nav-menu">
+                <a href="/dashboard.html" class="nav-item active">
+                    <span>📊</span> 仪表盘
+                </a>
+                <a href="/tasks.html" class="nav-item">
+                    <span>📋</span> 备份任务
+                </a>
+                <a href="/files.html" class="nav-item">
+                    <span>📁</span> 文件管理
+                </a>
+                <a href="/logs.html" class="nav-item">
+                    <span>📝</span> 操作日志
+                </a>
+                <a href="#" class="nav-item" onclick="logout()">
+                    <span>🚪</span> 退出登录
+                </a>
+            </div>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1>仪表盘</h1>
+                <div class="user-info">
+                    <span id="username">用户</span>
+                    <div class="user-avatar" id="user-avatar">U</div>
+                </div>
+            </div>
+
+            <!-- 统计卡片 -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="icon">📋</span>
+                    <h3>备份任务</h3>
+                    <div class="value" id="total-tasks">0</div>
+                </div>
+                <div class="stat-card">
+                    <span class="icon">💾</span>
+                    <h3>备份文件</h3>
+                    <div class="value" id="total-backups">0</div>
+                </div>
+                <div class="stat-card">
+                    <span class="icon">📊</span>
+                    <h3>总大小</h3>
+                    <div class="value" id="total-size">0 B</div>
+                </div>
+                <div class="stat-card">
+                    <span class="icon">⚡</span>
+                    <h3>全量/增量</h3>
+                    <div class="value"><span id="full-count">0</span> / <span id="inc-count">0</span></div>
+                </div>
+            </div>
+
+            <!-- 最近备份 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>最近备份</h2>
+                    <a href="/tasks.html" class="btn btn-primary btn-sm">新建任务</a>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>文件名</th>
+                                <th>类型</th>
+                                <th>大小</th>
+                                <th>创建时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-backups">
+                            <tr>
+                                <td colspan="4" class="empty-state">暂无备份</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 图表区域 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>备份趋势</h2>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chart" width="600" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // 检查登录状态
+        checkAuth();
+
+        // 加载统计数据
+        loadStats();
+
+        async function loadStats() {
+            try {
+                const data = await apiGet('/stats');
+
+                document.getElementById('total-tasks').textContent = data.total_tasks;
+                document.getElementById('total-backups').textContent = data.total_backups;
+                document.getElementById('total-size').textContent = data.total_size_human;
+                document.getElementById('full-count').textContent = data.full_count;
+                document.getElementById('inc-count').textContent = data.incremental_count;
+
+                // 显示最近备份
+                if (data.recent_backups && data.recent_backups.length > 0) {
+                    const tbody = document.getElementById('recent-backups');
+                    tbody.innerHTML = data.recent_backups.map(b => `
+                        <tr>
+                            <td>${b.filename}</td>
+                            <td><span class="badge badge-info">${b.type || 'full'}</span></td>
+                            <td>${b.size_human}</td>
+                            <td>${new Date(b.created_at).toLocaleString()}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // 绘制简单图表
+                drawChart(data);
+            } catch (error) {
+                console.error('加载统计失败:', error);
+            }
+        }
+
+        function drawChart(data) {
+            const canvas = document.getElementById('chart');
+            const ctx = canvas.getContext('2d');
+
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制简单饼图
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 50;
+
+            const total = data.full_count + data.incremental_count;
+            if (total === 0) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '16px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无数据', centerX, centerY);
+                return;
+            }
+
+            // 全量备份
+            const fullAngle = (data.full_count / total) * 2 * Math.PI;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, 0, fullAngle);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fill();
+
+            // 增量备份
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, fullAngle, 2 * Math.PI);
+            ctx.fillStyle = '#22c55e';
+            ctx.fill();
+
+            // 图例
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(canvas.width - 150, 20, 20, 20);
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = '14px Segoe UI';
+            ctx.textAlign = 'left';
+            ctx.fillText(`全量: ${data.full_count}`, canvas.width - 125, 35);
+
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(canvas.width - 150, 50, 20, 20);
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillText(`增量: ${data.incremental_count}`, canvas.width - 125, 65);
+        }
+    </script>
+</body>
+</html>
