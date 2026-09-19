@@ -24,17 +24,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM 输入版本号
-set /p VERSION=请输入版本号 (例如: 1.0.0):
+REM 读取当前版本
+set /p CURRENT_VERSION=<version.txt
+echo 当前版本: v%CURRENT_VERSION%
+echo.
 
-if "%VERSION%"=="" (
-    echo 错误: 版本号不能为空
-    pause
-    exit /b 1
+REM 输入新版本号
+set /p NEW_VERSION=请输入新版本号 (直接回车使用当前版本):
+
+if "%NEW_VERSION%"=="" (
+    set NEW_VERSION=%CURRENT_VERSION%
 )
 
 echo.
-echo 即将发布版本: v%VERSION%
+echo 即将发布版本: v%NEW_VERSION%
 echo.
 
 REM 确认发布
@@ -45,29 +48,34 @@ if /i not "%CONFIRM%"=="Y" (
     exit /b 0
 )
 
+REM 更新版本文件
+echo %NEW_VERSION%> version.txt
+
 echo.
-echo [1/4] 添加所有文件到暂存区...
+echo [1/5] 更新版本号到 %NEW_VERSION%...
+echo [2/5] 添加所有文件到暂存区...
 git add .
 
-echo [2/4] 提交更改...
-git commit -m "Release v%VERSION%"
+echo [3/5] 提交更改...
+git commit -m "Release v%NEW_VERSION%"
 
-echo [3/4] 创建版本标签...
-git tag -a "v%VERSION%" -m "Release v%VERSION%"
+echo [4/5] 创建版本标签...
+git tag -a "v%NEW_VERSION%" -m "Release v%NEW_VERSION%"
 
-echo [4/4] 推送到远程仓库...
+echo [5/5] 推送到远程仓库...
 git push origin main
-git push origin "v%VERSION%"
+git push origin "v%NEW_VERSION%"
 
 echo.
 echo ========================================
 echo    发布成功!
 echo ========================================
 echo.
-echo 版本 v%VERSION% 已发布
+echo 版本 v%NEW_VERSION% 已发布
 echo GitHub Actions 将自动构建 Release
 echo.
-echo 查看: https://github.com/your-username/backup-tool/releases
+echo 请稍等片刻，然后访问查看:
+echo https://github.com/your-username/backup-tool/releases
 echo.
 
 pause

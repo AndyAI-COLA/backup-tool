@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -25,17 +27,73 @@ jobs:
           cd backend
           pip install -r requirements.txt
 
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create release packages
+        run: |
+          # 创建临时打包目录
+          mkdir -p release-package/backup-tool
+
+          # 复制必要文件
+          cp -r backend/ release-package/backup-tool/
+          cp -r frontend/ release-package/backup-tool/
+          cp Dockerfile release-package/backup-tool/
+          cp docker-compose.yml release-package/backup-tool/
+          cp README.md release-package/backup-tool/
+          cp LICENSE release-package/backup-tool/
+          cp .gitignore release-package/backup-tool/
+          cp Makefile release-package/backup-tool/
+          cp release.sh release-package/backup-tool/
+          cp CHANGELOG.md release-package/backup-tool/
+          cp CONTRIBUTING.md release-package/backup-tool/
+          cp SECURITY.md release-package/backup-tool/
+
+          # 进入打包目录
+          cd release-package
+
+          # 创建zip包
+          zip -r ../backup-tool-v${{ steps.get_version.outputs.VERSION }}.zip backup-tool/
+
+          # 创建tar.gz包
+          tar -czf ../backup-tool-v${{ steps.get_version.outputs.VERSION }}.tar.gz backup-tool/
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          name: "v${{ steps.get_version.outputs.VERSION }}"
+          body: |
+            ## 🎉 版本 v${{ steps.get_version.outputs.VERSION }} 发布
+
+            ### 📦 下载
+            - [backup-tool-v${{ steps.get_version.outputs.VERSION }}.zip](https://github.com/${{ github.repository }}/releases/download/v${{ steps.get_version.outputs.VERSION }}/backup-tool-v${{ steps.get_version.outputs.VERSION }}.zip) - Windows推荐
+            - [backup-tool-v${{ steps.get_version.outputs.VERSION }}.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ steps.get_version.outputs.VERSION }}/backup-tool-v${{ steps.get_version.outputs.VERSION }}.tar.gz) - Linux/Mac推荐
+
+            ### 🚀 快速开始
+
+            **Docker部署:**
+            ```bash
+            tar -xzf backup-tool-v${{ steps.get_version.outputs.VERSION }}.tar.gz
+            cd backup-tool
+            docker-compose up -d
+            ```
+
+            **手动部署:**
+            ```bash
+            unzip backup-tool-v${{ steps.get_version.outputs.VERSION }}.zip
+            cd backup-tool/backend
+            pip install -r requirements.txt
+            uvicorn main:app --host 0.0.0.0 --port 8000
+            ```
+
+            ### 📝 更新内容
+            查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) 获取详细更新内容
           files: |
-            backup-tool.zip
+            backup-tool-v${{ steps.get_version.outputs.VERSION }}.zip
+            backup-tool-v${{ steps.get_version.outputs.VERSION }}.tar.gz
           generate_release_notes: true
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Zip release files
-        run: |
-          zip -r backup-tool.zip backend/ frontend/ Dockerfile docker-compose.yml README.md LICENSE .gitignore
